@@ -1,0 +1,13 @@
+for seed in 1 2 3
+    do
+        # nohup python -u ZO-DARTS_SAMVR.py --rand_seed ${seed} --data_path ../../nasbench201/dataset/organamnist.npz --dataset OrganAMNIST --temperature_decay 0.75 --batch_size 256 --save_dir ./noPenaltyFull/ZO_SAP_organa_+${seed}>organa.log 2>&1        
+        # nohup python -u ZO-DARTS_SAMVR.py --rand_seed ${seed} --data_path ../../nasbench201/dataset/organcmnist.npz --dataset OrganCMNIST --temperature_decay 0.75 --batch_size 256 --save_dir ./noPenaltyFull/ZO_SAP_organc_+${seed}>organc.log 2>&1        
+        # nohup python -u ZO-DARTS_SAMVR.py --rand_seed ${seed} --data_path ../../nasbench201/dataset/organsmnist.npz --dataset OrganSMNIST --temperature_decay 0.75 --batch_size 256 --save_dir ./noPenaltyFull/ZO_SAP_organs_+${seed}>organs.log 2>&1        
+        # nohup python -u ZO-DARTS_SAMVR.py --rand_seed ${seed} --data_path ../../nasbench201/dataset/octmnist.npz --dataset OCTMNIST --temperature_decay 0.75 --batch_size 512 --save_dir ./noPenaltyFull/ZO_SAP_oct_+${seed}>oct.log 2>&1   
+        # nohup python -u ZO-DARTS_SAMVR.py --rand_seed ${seed} --data_path ../../nasbench201/dataset/pneumoniamnist.npz --dataset PneumoniaMNIST --temperature_decay 0.75 --batch_size 32 --save_dir ./noPenaltyFull/ZO_SAP_pneumonia_+${seed}>pneumonia.log 2>&1       
+        # nohup python -u ZO-DARTS_SAMVR.py --rand_seed ${seed} --data_path ../../nasbench201/dataset/breastmnist.npz --dataset BreastMNIST --temperature_decay 0.75 --batch_size 16 --save_dir ./noPenaltyFull/ZO_SAP_breast_+${seed}>breast.log 2>&1        
+        # nohup python -u ZO-DARTS_SAMVR.py --rand_seed ${seed} --data_path ../../nasbench201/dataset/tissuemnist.npz --dataset TissueMNIST --temperature_decay 0.75 --batch_size 512 --save_dir ./noPenaltyFull/ZO_SAP_tissue_+${seed}>tissue.log 2>&1
+        nohup python -u ZO-DARTS_SAMVR.py --rand_seed ${seed} --data_path ../../nasbench201/dataset/pathmnist.npz --dataset PathMNIST --temperature_decay 0.75 --batch_size 512 --save_dir ./noPenaltyFull/ZO_SAP_path_+${seed}>path.log 2>&1
+        nohup python -u ZO-DARTS_SAMVR.py --rand_seed ${seed} --data_path ../../nasbench201/dataset/dermamnist.npz --dataset DermaMNIST --temperature_decay 0.75 --batch_size 128 --save_dir ./noPenaltyFull/ZO_SAP_derma_+${seed}>derma.log 2>&1
+        nohup python -u ZO-DARTS_SAMVR.py --rand_seed ${seed} --data_path ../../nasbench201/dataset/bloodmnist.npz --dataset BloodMNIST --temperature_decay 0.75 --batch_size 128 --save_dir ./noPenaltyFull/ZO_SAP_blood_+${seed}>blood.log 2>&1
+    done
