@@ -1,10 +1,3 @@
-2#################################################################################
-# Copyright (c) Xuanyi Dong [GitHub D-X-Y], 2020. Modified by Lunchen Xie, 2023.#
-#################################################################################
-# DARTS: Differentiable Architecture Search, ICLR 2019 #
-#############################################################################################
-# ZO-DARTS: DIFFERENTIABLE ARCHITECTURE SEARCH WITH ZEROTH-ORDER APPROXIMATION, ICASSP 2023 #
-#############################################################################################
 import os, sys, time, glob, random, argparse
 import numpy as np
 from copy import deepcopy

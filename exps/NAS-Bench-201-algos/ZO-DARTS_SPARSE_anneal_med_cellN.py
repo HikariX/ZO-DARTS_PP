@@ -1,10 +1,3 @@
-#################################################################################
-# Copyright (c) Xuanyi Dong [GitHub D-X-Y], 2020. Modified by Lunchen Xie, 2023.#
-#################################################################################
-# DARTS: Differentiable Architecture Search, ICLR 2019 #
-#############################################################################################
-# ZO-DARTS: DIFFERENTIABLE ARCHITECTURE SEARCH WITH ZEROTH-ORDER APPROXIMATION, ICASSP 2023 #
-#############################################################################################
 import os, sys, time, glob, random, argparse
 import numpy as np
 from copy import deepcopy
@@ -142,49 +135,6 @@ def _backward_step_ours_cellN(
     else:
         network.module.arch_parameters.grad.data.copy_(approx_grad.data)
         network.module.arch_parameters_cell.grad.data.copy_(approx_grad_cell.data)
-
-    return unrolled_loss.detach(), unrolled_logits.detach()
-
-def _backward_step_ours_penalty(
-        network,
-        network_perturb,
-        criterion,
-        arch_inputs,
-        arch_targets,
-        z,
-        mu
-):
-    unrolled_model = deepcopy(network)
-    unrolled_model.zero_grad()
-    _, unrolled_logits = unrolled_model(arch_inputs)
-    unrolled_loss = criterion(unrolled_logits, arch_targets)
-    unrolled_loss.backward()
-
-    implicit_grads = [v1.data - v2.data for v1, v2 in
-                      zip(network_perturb.module.get_weights(), network.module.get_weights())]
-    implicit_grads = torch.cat([torch.flatten(v) for v in implicit_grads], dim=0).unsqueeze(dim=1) / mu
-
-    grad_Lval_w = [v.grad.data for v in unrolled_model.module.get_weights()]
-    grad_Lval_w = torch.cat([torch.flatten(v) for v in grad_Lval_w], dim=0).unsqueeze(dim=1)
-
-    grad_Lval_a = unrolled_model.module.arch_parameters.grad
-    grad_Lval_a = torch.cat([torch.flatten(v) for v in grad_Lval_a], dim=0).unsqueeze(dim=1)
-
-    approx_grad = torch.mul((torch.mm(grad_Lval_a.t(), z) + torch.mm(implicit_grads.t(), grad_Lval_w)), z)
-    approx_grad = torch.reshape(approx_grad, network.module.arch_parameters.shape)
-
-    alpha = nn.functional.softmax(network.module.arch_parameters, dim=-1)
-    gamma = 0.2
-    grad_penalty = gamma * (2 * alpha - torch.ones_like(network.module.arch_parameters))
-    grad_penalty = torch.reshape(grad_penalty, z.shape)
-    penalty_grad_term = torch.mul(torch.mm(grad_penalty.t(), z), z)
-    penalty_grad_term = torch.reshape(penalty_grad_term, approx_grad.shape)
-    final_grad = approx_grad + penalty_grad_term
-
-    if network.module.arch_parameters.grad is None:
-        network.module.arch_parameters.grad = deepcopy(final_grad)
-    else:
-        network.module.arch_parameters.grad.data.copy_(final_grad.data)
 
     return unrolled_loss.detach(), unrolled_logits.detach()
 
