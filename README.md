@@ -76,3 +76,9 @@ python ZO-DARTS_SAMVR.py --rand_seed ${seed} --data_path ${path} --dataset ${dat
 ```
 
 Running this command starts ZO-DARTS++.
+
+## Acknowledgements
+
+The skeleton codebase in this repository was adapted from NAS-Bench-201[1].
+
+[1] X. Dong and Y. Yang, “Nas-bench-201: Extending the scope of reproducible neural architecture search,” in ICLR, 2020.
