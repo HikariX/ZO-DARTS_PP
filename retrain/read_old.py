@@ -63,12 +63,12 @@ if __name__ == '__main__':
               'PathMNIST': {}}
     
     dataset_list = ['PathMNIST', 'BloodMNIST', 'DermaMNIST', 'PneumoniaMNIST', 'TissueMNIST', 'OCTMNIST', 'BreastMNIST', 'OrganAMNIST', 'OrganCMNIST', 'OrganSMNIST']
-
-    resource_constraint = [1, 2, 3]
+    # dataset_list = ['PneumoniaMNIST', 'BreastMNIST', 'OrganAMNIST', 'OrganCMNIST', 'OrganSMNIST']
 
     jump_list = ['']
-    # for method in ['DARTS', 'ZO', 'MileNAS']:
-    for method in ['']:
+    for method in ['DARTS', 'DARTSAER', 'MileNAS', 'ZO', 'ZOP', 'ZOPP']:
+        avg_acc = 0
+        avg_size = 0
         for dataset in dataset_list:
             if dataset in jump_list:
                 continue
@@ -76,17 +76,18 @@ if __name__ == '__main__':
             size_dict[dataset][method] = [] # Prepare a recorder
             for seed in range(1, 4):
                 for r in range(1, 4):
-                    # path = './result_Others/{:}_{:}_seed{:}_round{:}.log'.format(method, dataset[:-5].lower(), str(seed), str(r))
-                    # path = './result_Full/{:}_seed{:}_round{:}.log'.format(dataset[:-5].lower(), str(seed), str(r))
-                    path = './result_ZO+/{:}_seed{:}_round{:}.log'.format(dataset[:-5].lower(), str(seed), str(r))
+                    path = './NewExp2025/result_Others/{:}_{:}_seed{:}_round{:}.log'.format(method, dataset[:-5].lower(), str(seed), str(r))  
                     max_result, structure = read_result(path)
                     result_dict[dataset][method].append(max_result)
                     size_dict[dataset][method].append(count_param.resource_calculator(structure, None, num_class=class_dict[dataset]) / 1000000)
             mean = round(statistics.mean(result_dict[dataset][method]), 1)
             std = round(statistics.stdev(result_dict[dataset][method]), 2)
             result_dict[dataset][method] = [mean, std]
+            avg_acc += mean
             
             mean = round(statistics.mean(size_dict[dataset][method]), 2)
             std = round(statistics.stdev(size_dict[dataset][method]), 1)
             size_dict[dataset][method] = [mean, std]
+            avg_size += mean
             print(method, dataset, result_dict[dataset][method], size_dict[dataset][method])
+        print(round(avg_acc, 2), round(avg_size, 3))

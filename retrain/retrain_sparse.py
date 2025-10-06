@@ -4,6 +4,7 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.optim as optim
 from xautodl.utils import get_model_infos
+from xautodl.models import get_search_spaces
 from xautodl.models.cell_searchs.retrain_model import DiscreteNetworkSPARSEZOANNEAL
 # from xautodl.models.cell_searchs.retrain_model_attention import DiscreteNetworkSPARSEZOANNEALATTENTION
 from xautodl.datasets import get_datasets
@@ -11,9 +12,10 @@ from cutmix_transforms import get_mixup_cutmix
 from torch.utils.data.dataloader import default_collate
 from xautodl.config_utils import load_config
 import os, sys, time, glob, argparse
+from checkNone import *
+sys.path.append('..')
 
 
-# os.environ["CUDA_VISIBLE_DEVICES"]="1"
 batchsize_dict = {'OrganAMNIST': 128,
                   'OrganCMNIST': 128,
                   'OrganSMNIST': 128,
@@ -37,31 +39,22 @@ class_num_dict = {'OrganSMNIST':11,
               'DermaMNIST': 7,
               'PathMNIST': 9}
 
-name_list = ['ZO', 'D', 'ZO_SA', 'M']
-
 def read_structure(method='ZO_SA', seed=None, dataset=None, budget=None):
     # path = "/root/ZO-DARTS_light_82/exps/NAS-Bench-201-algos/result/" + method + "_" + dataset[:-5].lower() + "+" + str(seed) + '/'
-    path = "../exps/NAS-Bench-201-algos/Penalty15_ZO+/ZO_SA_" + dataset[:-5].lower() + "_+" + str(seed) + '_' + str(
-        budget) + '/'
+    path = '../exps/NAS-Bench-201-algos/Extra_experiments/{:}_{:}_+{:}/'.format(method, dataset[:-5].lower(), seed)
     print(path)
     file = open(glob.glob(path + "*.log")[0], "r")
-    # file = open('./test.log', 'r')
     # 打开并读取每个文件的内容
     content = file.readlines()
     structure_recorder = ''
     for line in content:
-        if method == 'ZO_SA':
-            if '<<<--->>> The 039-050-th epoch : Structure' in line:
-                structure_recorder = line
-        else:
-            if "last-geno" in line:
-                structure_recorder = line
+        if "last-geno" in line:
+            structure_recorder = line
     print(structure_recorder)
     structures = structure_recorder.split('Structure(4 nodes with ')[1:]
-    structures[0] = structures[0][:-2] # Delete excessive brackets
+    print(structures)
+    structures[0] = structures[0][:-3] # Delete excessive brackets
     return structures[0]
-
-# print(read_structure(seed=1, dataset='OrganSMNIST', budget=100000))
 #
 def main(xargs):
     batch_size = batchsize_dict[xargs.dataset]
@@ -79,34 +72,20 @@ def main(xargs):
     lr_warmup_method = 'linear'
     lr_warmup_decay = 0.01
     lr_min = 0
-    epochs = 500
+    epochs = 300
     label_smoothing = 0.1
     dataset = xargs.dataset
     cell_number = 3
     structure = read_structure(xargs.method, xargs.rand_seed, xargs.dataset, xargs.budget)
-
-    print('batch_size:{:}, learning_rate:{:}, momentum:{:}, weight_decay:{:}, '
-          'report_freq:{:}, mixup_alpha:{:},cutmix_alpha:{:}, num_classes:{:}, '
-          'workers:{:}, dataset:{:}, lr_stepsize:{:}, lr_gamma:{:}, lr_warmup_epochs:{:}, '
-          'lr_warmup_method:{:}, lr_warmup_decay:{:}, lr_min:{:}, epochs:{:}, label_smoothing:{:}, cell_number:{:}. structure:{:}'.format(
-        batch_size, learning_rate, momentum, weight_decay, report_freq, mixup_alpha,
-        cutmix_alpha, num_classes, workers, dataset, lr_stepsize, lr_gamma, lr_warmup_epochs,
-        lr_warmup_method, lr_warmup_decay, lr_min, epochs, label_smoothing, cell_number, structure))
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    params = None
-    net = DiscreteNetworkSPARSEZOANNEAL(C=16, N=cell_number, max_nodes=4, num_classes=num_classes,
-                                        search_space='nas-bench-201',
-                                        structure=structure, affine=False, track_running_stats=False, params=params)
-    net.to(device)
-
-    # # 加载CIFAR-10数据集
-    # train_data, test_data, xshape, class_num = get_datasets(
-    #     "cifar10", "/root/autodl-fs/ZO_DARTS_light_test/nasbench201/dataset/cifar", -1
-    # )
+    
+    alert, new_structure = check_and_simplify_architecture(structure)
+    if alert == 1: # Invalid structures included.
+        print('*' * 100, 'No available structure')
+        return
+    
     datapath = "../nasbench201/dataset/" + xargs.dataset.lower() + ".npz"
     train_data, test_data, xshape, class_num = get_datasets(
-        dataset, datapath, -1, mode='retrain_nopipe'
+        xargs.dataset, datapath, -1, mode='retrain_nopipe'
     )
 
     mixup_cutmix = get_mixup_cutmix(
@@ -122,31 +101,7 @@ def main(xargs):
 
     # 定义损失函数和优化器
     criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
-    # criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), learning_rate, momentum, weight_decay)
-    # flop, param = get_model_infos(net, xshape)
-
-
-
-    main_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=epochs - lr_warmup_epochs, eta_min=lr_min
-    )
-
-    if lr_warmup_epochs > 0:
-        if lr_warmup_method == "linear":
-            warmup_lr_scheduler = torch.optim.lr_scheduler.LinearLR(
-                optimizer, start_factor=lr_warmup_decay, total_iters=lr_warmup_epochs
-            )
-        elif lr_warmup_method == "constant":
-            warmup_lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
-                optimizer, factor=lr_warmup_decay, total_iters=lr_warmup_epochs
-            )
-        else:
-            raise RuntimeError(f"Invalid warmup lr method '{args.lr_warmup_method}'. Only linear and constant are supported.")
-        lr_scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer,schedulers=[warmup_lr_scheduler, main_lr_scheduler],milestones=[lr_warmup_epochs])
-    else:
-        lr_scheduler = main_lr_scheduler
-
+    
     trainloader = torch.utils.data.DataLoader(
         train_data,
         batch_size=batch_size,
@@ -164,6 +119,45 @@ def main(xargs):
         pin_memory=True
     )
 
+    print('batch_size:{:}, learning_rate:{:}, momentum:{:}, weight_decay:{:}, '
+          'report_freq:{:}, mixup_alpha:{:},cutmix_alpha:{:}, num_classes:{:}, '
+          'workers:{:}, dataset:{:}, lr_stepsize:{:}, lr_gamma:{:}, lr_warmup_epochs:{:}, '
+          'lr_warmup_method:{:}, lr_warmup_decay:{:}, lr_min:{:}, epochs:{:}, label_smoothing:{:}, structure:{:}'.format(
+        batch_size, learning_rate, momentum, weight_decay, report_freq, mixup_alpha,
+        cutmix_alpha, num_classes, workers, xargs.dataset, lr_stepsize, lr_gamma, lr_warmup_epochs,
+        lr_warmup_method, lr_warmup_decay, lr_min, epochs, label_smoothing, structure))
+
+    params = None
+    search_space = get_search_spaces("cell", 'nas-bench-201') # The search_space setting is of no usage now.
+    net = DiscreteNetworkSPARSEZOANNEAL(C=16, N=3, max_nodes=4, num_classes=num_classes,
+                                             search_space=search_space,
+                                             structure=structure, affine=False, track_running_stats=False,
+                                             params=params) # The discrete structure function is the same as original one.
+    net.to(device)
+
+    optimizer = optim.SGD(net.parameters(), learning_rate, momentum, weight_decay)
+    main_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=epochs - lr_warmup_epochs, eta_min=lr_min
+    )
+
+    if lr_warmup_epochs > 0:
+        if lr_warmup_method == "linear":
+            warmup_lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+                optimizer, start_factor=lr_warmup_decay, total_iters=lr_warmup_epochs
+            )
+        elif lr_warmup_method == "constant":
+            warmup_lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
+                optimizer, factor=lr_warmup_decay, total_iters=lr_warmup_epochs
+            )
+        else:
+            pass
+        lr_scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer,
+                                                             schedulers=[warmup_lr_scheduler, main_lr_scheduler],
+                                                             milestones=[lr_warmup_epochs])
+    else:
+        lr_scheduler = main_lr_scheduler
+
+    recorder = 0
     # 训练神经网络模型
     for epoch in range(epochs):  # 遍历数据集多次
         running_loss = 0.0
@@ -206,6 +200,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--rand_seed", type=int, default=2, help="manual seed")
     parser.add_argument("--method", type=str, default='ZO_SA', help="method")
-    parser.add_argument("--budget", type=int, default=1000000, help='resource budget')
+    parser.add_argument("--budget", type=int, default=1, help='resource budget')
+    parser.add_argument("--GPU", type=str, default='0', help='GPU')
     args = parser.parse_args()
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.GPU
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     main(args)

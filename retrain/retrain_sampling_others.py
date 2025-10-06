@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from xautodl.utils import get_model_infos
 from xautodl.models import get_search_spaces
-from xautodl.models.cell_searchs.retrain_model_cellN import DiscreteNetworkSPARSEZOANNEALCELLN
+from xautodl.models.cell_searchs.retrain_model import DiscreteNetworkSPARSEZOANNEAL
 from xautodl.datasets import get_datasets
 from cutmix_transforms import get_mixup_cutmix
 from torch.utils.data.dataloader import default_collate
@@ -13,24 +13,23 @@ from xautodl.config_utils import load_config
 import os, sys, time, glob, argparse
 import math
 from checkNone import *
+
 sys.path.append('..')
 import StructureSampler
 
-def main(xargs):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    batchsize_dict = {'OrganAMNIST': 128,
-                      'OrganCMNIST': 128,
-                      'OrganSMNIST': 128,
-                      'PneumoniaMNIST': 16,
-                      'OCTMNIST': 128,
-                      'BreastMNIST': 64,
-                      'BloodMNIST': 32,
-                      'DermaMNIST': 32,
-                      'PathMNIST': 128,
-                      'TissueMNIST': 256
-                      }
+batchsize_dict = {'OrganAMNIST': 128,
+                  'OrganCMNIST': 128,
+                  'OrganSMNIST': 128,
+                  'PneumoniaMNIST': 16,
+                  'OCTMNIST': 128,
+                  'BreastMNIST': 64,
+                  'BloodMNIST': 32,
+                  'DermaMNIST': 32,
+                  'PathMNIST': 128,
+                  'TissueMNIST': 256
+                  }
 
-    class_num_dict = {'OrganSMNIST':11,
+class_num_dict = {'OrganSMNIST': 11,
                   'OrganCMNIST': 11,
                   'OrganAMNIST': 11,
                   'OCTMNIST': 4,
@@ -41,16 +40,28 @@ def main(xargs):
                   'DermaMNIST': 7,
                   'PathMNIST': 9}
 
-    performance_dict = {'OrganSMNIST':0.55,
-                  'OrganCMNIST': 0.7,
-                  'OrganAMNIST': 0.7,
-                  'OCTMNIST': 0.6,
-                  'PneumoniaMNIST': 0.75,
-                  'BreastMNIST': 0.65,
-                  'BloodMNIST': 0.7,
-                  'TissueMNIST': 0.4,
-                  'DermaMNIST': 0.55,
-                  'PathMNIST': 0.6}
+performance_dict = {'OrganSMNIST': 0.55,
+                    'OrganCMNIST': 0.7,
+                    'OrganAMNIST': 0.7,
+                    'OCTMNIST': 0.6,
+                    'PneumoniaMNIST': 0.75,
+                    'BreastMNIST': 0.65,
+                    'BloodMNIST': 0.7,
+                    'TissueMNIST': 0.4,
+                    'DermaMNIST': 0.55,
+                    'PathMNIST': 0.6}
+
+def getPath(method, dataset, rand_seed):
+    if method == 'DARTSAER':
+        file_path = '../exps/NAS-Bench-201-algos/Extra_experiments/DARTSAER_{:}_+{:}/'.format(dataset[:-5].lower(), rand_seed)
+    elif method == 'ZOP':
+        file_path = '../exps/NAS-Bench-201-algos/ZO+/ZO_SA_{:}_+{:}/'.format(dataset[:-5].lower(), rand_seed)
+    else:
+        file_path = '../exps/NAS-Bench-201-algos/Others/{:}_{:}_+{:}/'.format(method, dataset[:-5].lower(), rand_seed)
+    return file_path
+
+
+def main(xargs):
     batch_size = batchsize_dict[xargs.dataset]
     learning_rate = 0.1
     momentum = 0.9
@@ -69,28 +80,12 @@ def main(xargs):
     epochs = 300
     label_smoothing = 0.1
 
-    budget_dict = {'small': {}, 'medium': {}, 'large': {}}
 
-    file_dict = {'small': 'size_p02.txt',
-                 'medium': 'size_p46.txt',
-                 'large': 'size_p8X.txt'}
-    for size in ['small', 'medium', 'large']:
-        content = open('../exps/NAS-Bench-201-algos/' + file_dict[size], 'r').readlines()
-        for line in content:
-            result = eval(line)
-            budget_dict[size][result[0]] = result[1:]
-
-    mapping = {1: 'small', 2: 'medium',
-               3: 'large'}
-    
-
-    # file_path = '../exps/NAS-Bench-201-algos/Penalty15_percentile/ZO_SAP_{:}_+{:}_constraint{:}/'.format(xargs.dataset[:-5].lower(), str(xargs.rand_seed), str(xargs.budget))
-    file_path = '../exps/NAS-Bench-201-algos/noPenaltyFull/ZO_SAP_{:}_+{:}/'.format(xargs.dataset[:-5].lower(), str(xargs.rand_seed))
-    arch, mix, exit = StructureSampler.read_prob(file_path)
-    # budget_limit =  budget_dict[mapping[xargs.budget]][xargs.dataset]
+    file_path = getPath(xargs.method, xargs.dataset, xargs.rand_seed)
+    arch, _, _ = StructureSampler.read_prob(file_path)
 
     params = None
-    search_space = get_search_spaces("cell", 'nas-bench-201-varied')
+    search_space = get_search_spaces("cell", 'nas-bench-201') # The search_space setting is of no usage now.
 
     datapath = "../nasbench201/dataset/" + xargs.dataset.lower() + ".npz"
     train_data, test_data, xshape, class_num = get_datasets(
@@ -131,29 +126,25 @@ def main(xargs):
 
     counter = 0
     while counter < epochs:
-        structure_list, cell_list = StructureSampler.structure_generator(arch, mix, exit)
-        new_structure_list = []
-        alert_list = []
-        for s in structure_list:
-            alert, structure = check_and_simplify_architecture(s)
-            alert_list.append(alert)
-            new_structure_list.append(structure)
-        structure_list = new_structure_list # Use the simplified structure list.
-        if 1 in alert_list: # Invalid structures included.
+        structure = StructureSampler.structure_generator_old(arch)
+        
+        alert, new_structure = check_and_simplify_architecture(structure)
+        structure = new_structure # Use the simplified structure list.
+        if alert == 1: # Invalid structures included.
             continue # Start a new sampling process.
 
         print('batch_size:{:}, learning_rate:{:}, momentum:{:}, weight_decay:{:}, '
               'report_freq:{:}, mixup_alpha:{:},cutmix_alpha:{:}, num_classes:{:}, '
               'workers:{:}, dataset:{:}, lr_stepsize:{:}, lr_gamma:{:}, lr_warmup_epochs:{:}, '
-              'lr_warmup_method:{:}, lr_warmup_decay:{:}, lr_min:{:}, epochs:{:}, label_smoothing:{:}, structure:{:}, cellnumber:{:}'.format(
+              'lr_warmup_method:{:}, lr_warmup_decay:{:}, lr_min:{:}, epochs:{:}, label_smoothing:{:}, structure:{:}'.format(
             batch_size, learning_rate, momentum, weight_decay, report_freq, mixup_alpha,
             cutmix_alpha, num_classes, workers, xargs.dataset, lr_stepsize, lr_gamma, lr_warmup_epochs,
-            lr_warmup_method, lr_warmup_decay, lr_min, epochs, label_smoothing, structure_list, cell_list))
-        
-        net = DiscreteNetworkSPARSEZOANNEALCELLN(C=16, N=3, max_nodes=4, num_classes=num_classes,
+            lr_warmup_method, lr_warmup_decay, lr_min, epochs, label_smoothing, structure))
+
+        net = DiscreteNetworkSPARSEZOANNEAL(C=16, N=3, max_nodes=4, num_classes=num_classes,
                                                  search_space=search_space,
-                                                 structure=structure_list, affine=False, track_running_stats=False,
-                                                 cell_list=cell_list, params=params)
+                                                 structure=structure, affine=False, track_running_stats=False,
+                                                 params=params) # The discrete structure function is the same as original one.
         net.to(device)
 
         optimizer = optim.SGD(net.parameters(), learning_rate, momentum, weight_decay)
@@ -219,14 +210,12 @@ def main(xargs):
                     counter = 0
                     recorder = 0
                     break
-                elif math.fabs(correct / total - recorder < 1e-2) and correct / total < 0.8: # Examine if the model didn't learn anything.
+                elif math.fabs(correct / total - recorder < 1e-2) and correct / total < 0.8:  # Examine if the model didn't learn anything.
                     print('The model learned nothing! Starting a new model.')
                     print('*' * 50)
                     counter = 0
                     recorder = 0
                     break
-
-
 
 
 if __name__ == "__main__":
@@ -239,9 +228,10 @@ if __name__ == "__main__":
         default="OrganSMNIST",
     )
     parser.add_argument("--rand_seed", type=int, default=2, help="manual seed")
-    parser.add_argument("--budget", type=int, default=1, help='resource budget')
+    parser.add_argument("--method", type=str, default='DARTS', help='search algorithm')
     parser.add_argument("--GPU", type=str, default='0', help='GPU')
     args = parser.parse_args()
     os.environ['CUDA_VISIBLE_DEVICES'] = args.GPU
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     main(args)
 

@@ -75,34 +75,30 @@ if __name__ == '__main__':
     jump_list = []
     dataset_list = ['PathMNIST', 'BloodMNIST', 'DermaMNIST', 'PneumoniaMNIST', 'TissueMNIST', 'OCTMNIST', 'BreastMNIST', 'OrganAMNIST', 'OrganCMNIST', 'OrganSMNIST']
     # dataset_list = ['PneumoniaMNIST', 'TissueMNIST', 'OCTMNIST', 'BreastMNIST', 'OrganAMNIST', 'OrganCMNIST', 'OrganSMNIST']
-    for constraint in resource_constraint:
+    for method in ['ZO_PP']:
         avg_acc = 0
         avg_size = 0
         for dataset in dataset_list:
             if dataset in jump_list:
                 continue
-            result_dict[dataset][constraint] = [] # Prepare a recorder
-            size_dict[dataset][constraint] = [] # Prepare a recorder
+            result_dict[dataset][method] = [] # Prepare a recorder
+            size_dict[dataset][method] = [] # Prepare a recorder
             for seed in range(1, 4):
                 for r in range(1, 4):
-                    path = './NewExp2025/result_percentile/{:}_constraint{:}_seed{:}_round{:}.log'.format(dataset[:-5].lower(), str(constraint), str(seed), str(r))
+                    path = './NewExp2025/result_Full/{:}_seed{:}_round{:}.log'.format(dataset[:-5].lower(), str(seed), str(r))
                     max_result, structure, cell = read_result(path)
-                    result_dict[dataset][constraint].append(max_result)
-                    size_dict[dataset][constraint].append(count_param.resource_calculator(structure, cell, num_class=class_dict[dataset]) / 1000000)
-                    # if constraint == 2:
-                    #     print(path)
-                    #     print(count_param.resource_calculator(structure, cell, num_class=class_dict[dataset]) / 1000000)
-                    
-            mean = round(statistics.mean(result_dict[dataset][constraint]), 1)
-            std = round(statistics.stdev(result_dict[dataset][constraint]), 2)
-            result_dict[dataset][constraint] = [mean, std]
+                    result_dict[dataset][method].append(max_result)
+                    size_dict[dataset][method].append(count_param.resource_calculator(structure, cell, num_class=class_dict[dataset]) / 1000000)
+            mean = round(statistics.mean(result_dict[dataset][method]), 1)
+            std = round(statistics.stdev(result_dict[dataset][method]), 2)
+            result_dict[dataset][method] = [mean, std]
             avg_acc += mean
             
-            mean = round(statistics.mean(size_dict[dataset][constraint]), 2)
-            std = round(statistics.stdev(size_dict[dataset][constraint]), 1)
-            size_dict[dataset][constraint] = [mean, std]
+            mean = round(statistics.mean(size_dict[dataset][method]), 2)
+            std = round(statistics.stdev(size_dict[dataset][method]), 1)
+            size_dict[dataset][method] = [mean, std]
             avg_size += mean
-            print(dataset, constraint, result_dict[dataset][constraint], size_dict[dataset][constraint])
+            print(dataset, result_dict[dataset][method], size_dict[dataset][method])
         print(round(avg_acc, 2), round(avg_size, 3))
    
 
